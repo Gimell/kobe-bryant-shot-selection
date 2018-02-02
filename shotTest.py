@@ -3,6 +3,7 @@
 
 
 #1 Load libraries
+#Load libraries
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -29,7 +30,21 @@ from sklearn.ensemble import BaggingClassifier, ExtraTreesClassifier, GradientBo
 sns.set_style('whitegrid')
 pd.set_option('display.max_columns', None) # display all columns
 
+
 #Load dataset,convert some columns to category type
+'''
+问：category和object是什么类别？
+ 答：翻阅了pandas官网没太看明白。If a pandas object contains data multiple dtypes IN A SINGLE COLUMN, the dtype of the column will be chosen to accommodate all of the data types (object is the most general)
+This is an introduction to pandas categorical data type, including a short comparison with R’s factor.
+Categoricals are a pandas data type, which correspond to categorical variables in statistics: a variable, which can take on only a limited, and usually fixed, number of possible values (categories; levels in R). Examples are gender, social class, blood types, country affiliations, observation time or ratings via Likert scales.
+In contrast to statistical categorical variables, categorical data might have an order (e.g. ‘strongly agree’ vs ‘agree’ or ‘first observation’ vs. ‘second observation’), but numerical operations (additions, divisions, ...) are not possible.
+All values of categorical data are either in categories or np.nan. Order is defined by the order of categories, not lexical order of the values. Internally, the data structure consists of a categories array and an integer array of codeswhich point to the real value in the categories array.
+The categorical data type is useful in the following cases:
+A string variable consisting of only a few different values. Converting such a string variable to a categorical variable will save some memory, see here.
+The lexical order of a variable is not the same as the logical order (“one”, “two”, “three”). By converting to a categorical and specifying an order on the categories, sorting and min/max will use the logical order instead of the lexical order, see here.
+As a signal to other python libraries that this column should be treated as a categorical variable (e.g. to use suitable statistical methods or plot types).
+See also the API docs on categoricals.
+'''
 data = pd.read_csv('../kobe-bryant-shot-selection/Data/data.csv') #..是pycharm的默认项目路径，在setting中可以设置
 
 data.set_index('shot_id', inplace=True)
@@ -70,6 +85,11 @@ print('\n' * 2)
 
 #Data Visualization
 #直方图
+'''
+问：以下代码什么意思？
+答：在matplotlib中，整个图像为一个Figure对象。在Figure对象中可以包含一个或者多个Axes对象。每个Axes(ax)对象都是一个拥有自己坐标系统的绘图区域。
+https://www.cnblogs.com/nju2014/p/5620776.html
+'''
 ax = plt.axes()
 sns.countplot(x='shot_made_flag', data=data, ax=ax);
 ax.set_title('Target class distribution')
@@ -100,6 +120,17 @@ plt.show()
 
 
 #多变量作图
+'''
+问：sns.pairplot()的图没看懂。
+答：多变量作图
+seaborn可以一次性两两组合多个变量做出多个对比图，有n个变量，就会做出一个n × n个格子的图，譬如有2个变量，就会产生4个格子，每个格子就是两个变量之间的对比图
+var1  vs  var1
+var1  vs  var2
+var2  vs  var1
+var2  vs  var2
+相同的两个变量之间（var1  vs  var1 和 var2  vs  var2）以直方图展示，不同的变量则以散点图展示（var1  vs  var2 和var2  vs  var1）
+要注意的是数据中不能有NaN（缺失的数据），否则会报错
+'''
 sns.pairplot(data, vars=['loc_x', 'loc_y', 'lat', 'lon', 'shot_distance'], hue='shot_made_flag', size=3)
 plt.show()
 
@@ -147,6 +178,10 @@ data_cl.drop('team_name', axis=1, inplace=True) # Always LA Lakers
 data_cl.drop('shot_made_flag', axis=1, inplace=True)
 
 #There are also many outliers, remove them:
+'''
+问：以下代码什么意思？
+答：异常值检测 原理我还不知道
+'''
 def detect_outliers(series, whis=1.5):
     q75, q25 = np.percentile(series, [75 ,25])
     iqr = q75 - q25
@@ -160,27 +195,28 @@ def detect_outliers(series, whis=1.5):
 
 # Remaining time
 data_cl['seconds_from_period_end'] = 60 * data_cl['minutes_remaining'] + data_cl['seconds_remaining']
-data_cl['last_5_sec_in_period'] = data_cl['seconds_from_period_end'] < 5
+data_cl['last_5_sec_in_period'] = data_cl['seconds_from_period_end'] < 5 #增加last特征，若剩余时间小于5秒，则此值为1
 
 data_cl.drop('minutes_remaining', axis=1, inplace=True)
 data_cl.drop('seconds_remaining', axis=1, inplace=True)
 data_cl.drop('seconds_from_period_end', axis=1, inplace=True)
 
 ## Matchup - (away/home)
-data_cl['home_play'] = data_cl['matchup'].str.contains('vs').astype('int')
+data_cl['home_play'] = data_cl['matchup'].str.contains('vs').astype('int')  #新增特征home_play，主场的此特征值为1，客场则此特征值为0
 data_cl.drop('matchup', axis=1, inplace=True)
 
 # Game date
 data_cl['game_date'] = pd.to_datetime(data_cl['game_date'])
-data_cl['game_year'] = data_cl['game_date'].dt.year
-data_cl['game_month'] = data_cl['game_date'].dt.month
-data_cl.drop('game_date', axis=1, inplace=True)
+data_cl['game_year'] = data_cl['game_date'].dt.year  #添加year特征年
+data_cl['game_month'] = data_cl['game_date'].dt.month  #添加month特征月
+data_cl.drop('game_date', axis=1, inplace=True) #为什么不添加天？
 
 # Loc_x, and loc_y binning
-data_cl['loc_x'] = pd.cut(data_cl['loc_x'], 25)
+data_cl['loc_x'] = pd.cut(data_cl['loc_x'], 25)  #25是什么意思？
 data_cl['loc_y'] = pd.cut(data_cl['loc_y'], 25)
 
 # Replace 20 least common action types with value 'Other'
+#对投篮方式进行排序，选出最少的20种标记为其他。
 rare_action_types = data_cl['action_type'].value_counts().sort_values().index.values[:20]
 data_cl.loc[data_cl['action_type'].isin(rare_action_types), 'action_type'] = 'Other'
 
@@ -191,11 +227,26 @@ categorial_cols = [
     'game_month', 'opponent', 'loc_x', 'loc_y']
 
 #离散特征编码，one-hot编码
+'''
+问：解释get_dummies()
+答：离散特征的编码分为两种情况：
+1、离散特征的取值之间没有大小的意义，比如color：[red,blue],那么就使用one-hot编码。将分类变量（categorical variable）转换为“哑变量矩阵”（dummy matrix）或“指标矩阵”（indicator matrix）。如果DataFrame的某一列中含有k个不同的值，则可以派生出一个k列矩阵或DataFrame（其值全为1和0）。
+2、离散特征的取值有大小的意义，比如size:[X,XL,XXL],那么就使用数值的映射{X:1,XL:2,XXL:3}
+one-hot编码举例：
+>>> s = pd.Series(list('abca'))
+
+>>> pd.get_dummies(s)
+   a  b  c
+0  1  0  0
+1  0  1  0
+2  0  0  1
+3  1  0  0
+'''
 for cc in categorial_cols:
     dummies = pd.get_dummies(data_cl[cc])
-    dummies = dummies.add_prefix("{}#".format(cc))
-    data_cl.drop(cc, axis=1, inplace=True)
-    data_cl = data_cl.join(dummies)
+    dummies = dummies.add_prefix("{}#".format(cc)) #加前缀？没明白
+    data_cl.drop(cc, axis=1, inplace=True) #删除cc列，即原来的categories列
+    data_cl = data_cl.join(dummies)  #增加新的dunniies列
 
 #Feature Selection
 # Separate dataset for validation
@@ -212,6 +263,10 @@ threshold = 0.90
 vt = VarianceThreshold().fit(X)
 
 # Find feature names
+'''
+问：解释以下代码。
+答：
+'''
 feat_var_threshold = data_cl.columns[vt.variances_ > threshold * (1-threshold)]
 print("Variance Threshold选出的特征")
 print(feat_var_threshold)
@@ -275,6 +330,8 @@ for f in features:
 
 
 #Prepare dataset for further analysis
+#注释：http://blog.csdn.net/xw_classmate/article/details/51333646
+#选出features特征的数据
 data_cl = data_cl.ix[:, features]
 data_submit = data_submit.ix[:, features]
 X = X.ix[:, features]
@@ -285,6 +342,7 @@ print('Train features shape: {}'.format(X.shape))
 print('Target label shape: {}'. format(Y.shape))
 
 #PCA Visualization
+#PCA https://github.com/worldveil/dejavu
 components = 8
 pca = PCA(n_components=components).fit(X)
 
